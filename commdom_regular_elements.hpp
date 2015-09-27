@@ -25,7 +25,7 @@ class Regular
        name       = "Regular";
 
        n_total_cells    = 0; 
-       n_total_vertex   = 0;
+//       n_total_vertex   = 0;
 
       _n_total_vertices = 0; 
 
@@ -57,7 +57,7 @@ class Regular
             _index[0] = 0; 
       }
 
-      if(debug) cout<<"["<< name <<"] total_number_of_cells_type["<< _cell <<"]="<< _idx_cell.size() <<"  \n";
+      if(debug) cout<<"["<< name <<"."<< _cell<<"] total_number_of_cells_type='"<< _idx_cell.size() <<"' \n";
 
       __set_time__(); 
     }
@@ -109,7 +109,7 @@ class Regular
         _connectivity = vector<int>( n_local_vertices, -1); 
       }
 
-      if(debug) cout<<"["<< name <<"."<< _cell <<"] allocate_connectivity="<< _connectivity.size() <<"  \n";
+      if(debug) cout<<"["<< name <<"."<< _cell <<"] allocate_connectivity='"<< _connectivity.size() <<"'  \n";
 
       __set_time__(); 
     }
@@ -118,6 +118,7 @@ class Regular
     void set_cells_by_ptr(int* vertices_ptr)
     {
       debug = false;
+
       if(_run)
       {
         int  n_vertices_before_me = 0;
@@ -147,10 +148,12 @@ class Regular
         }
         // the last one is take into account HERE
         _vertex_index.push_back( _n_total_vertices ); 
+//        face_index
 
       //if(debug) 
           cout<<"["<< name <<"."<< _cell <<"] n_vertices='" << n_vertices_before_me <<"' "; 
-          cout<<"_vertex_index.size='"<< _vertex_index.back() <<"' "; 
+          cout<<"_vertex_index.back='"<< _vertex_index.back() <<"' "; 
+          cout<<"_index.back='"<< _index.back() <<"' ";
           cout<<" \n";
 
         if(_index.back() != n_vertices_before_me) 
@@ -219,6 +222,30 @@ class Regular
     }
 
 
+    void set_faces_by_ptr(int* ptr)
+    {
+      /*
+  _connectivity == _vertex_num <- set_connectivity_by_cell    
+         _index == _face_index  <- set_connectivity_by_cell 
+  _vertex_index ->    
+      */
+      if(_run)
+      {
+        if(_irregular)
+        {
+/*
+          int n_faces = _index.back(); ; // <-- _face_index  
+          cout<<"["<< name <<"] n_faces["<< _cell <<"]='" << n_faces <<"' \n";
+
+          _vertex_index = vector<int>(n_faces+1,-1);  
+
+          for(int j=0; j<n_faces_in_cell;    j++, l++) _vertex_index[l] = first_face_in_cell_ptr[j] + n_vertices_before_me;
+*/
+        }
+      }
+    }
+
+
     void set_faces_by_cell(int* ptIds, int* n_vertices, int* vertices, int* n_faces, int* faces)
     {
       /*
@@ -252,7 +279,7 @@ class Regular
             m++;
             int id_k = ptIds[m];
           //if(debug) cout<< id_k <<" "; 
-            vertex_num.push_back( id_k );
+            vertex_num.push_back( id_k+1 ); // Fortran Style (PLE) 
           }
         //if(debug) cout<<"] ";
           vertex_index[i+1] = vertex_index[i] + numFaceiPts;
@@ -281,15 +308,6 @@ class Regular
     } // set_faces_by_cell
 
 
-    void get_cells_ptr(int* vertex_index, int* vertex_num=NULL)
-    {
-       vertex_index = &(*( _index.begin()+0 ));   
-    }
-/*
-  _connectivity == _vertex_num   <- set_connectivity_by_cell    
-         _index == _face_index   <- set_connectivity_by_cell 
-                   _vertex_index <- set_connectivity_by_cell (irregular) 
-*/
     void print_cells()
     {
       if(_run)
@@ -326,8 +344,48 @@ class Regular
       } // _run 
     } // print  
 
-    int n_total_cells;
-    int n_total_vertex;
+
+    // C++ NOTE: Passing an Argument as a Reference to a Pointer. 
+    //           'vertex_num' is now a reference to pointer '&(*( _connectivity.begin()+0))'!
+    //           This means if we CHANGE 'vertex_num', we change '&(*( _connectivity.begin()+0))'!
+    void get_cells_ptr(int*& vertex_num, int*& vertex_index, int*& face_num, int*& face_index)
+    {
+        face_index =  NULL; 
+          face_num =  NULL;
+      vertex_index =  NULL; // &(*( _index.begin()+0)); // 'stride' is a constant! 
+        vertex_num = &(*( _connectivity.begin()+0)); 
+
+      if(_irregular)
+      {
+           _face_num = vector<int>(_index.back(), -1); 
+           for(int i = 0; i<_face_num.size(); i++) _face_num[i] = -(i+1);  // Fortran Style (PLE)  
+
+          face_index = &(*(        _index.begin()+0)); 
+            face_num = &(*(     _face_num.begin()+0));
+        vertex_index = &(*( _vertex_index.begin()+0)); 
+          vertex_num = &(*( _connectivity.begin()+0)); 
+      }
+/*
+cout<<"[get_cells_ptr] Connectivity_size="<< _connectivity.size() <<" ";
+cout<< vertex_num[_connectivity.size()-1]  <<" ";
+cout<<"\n"; 
+*/
+    }
+
+
+    void get_sizes( int* n_vertex, int* n_cells, int* n_faces )
+    {
+       n_cells[0] = _idx_cell.size(); 
+       n_faces[0] = 0;
+      n_vertex[0] = _index.back();  
+
+      if(_irregular)
+      {
+         n_faces[0] = _index.back(); 
+        n_vertex[0] = _vertex_index.back(); 
+      }
+    }
+
 
   private:
 
@@ -344,6 +402,8 @@ class Regular
     {
       _timer.push_back( clock()/CLOCKS_PER_SEC );  
     }
+
+    int n_total_cells; 
 
     string name;
     bool debug;
@@ -370,6 +430,7 @@ class Regular
     vector<int> _connectivity;
     vector<int> _index;  
     vector<int> _vertex_index; 
+    vector<int>   _face_num;
 
     vector<clock_t> _timer; 
 };
@@ -380,7 +441,7 @@ class RegularCells
   public: 
    ~RegularCells()
     {
-      delete[] _TYPES; 
+//      delete[] _TYPES; 
     }
 
     RegularCells()
@@ -468,20 +529,38 @@ class RegularCells
         _TYPES[i++].print_cells();
     }
 
-    int n_types; 
 
-  private: 
+    void get_sizes( int idx, int* n_total_vertex, int* n_total_cells, int* n_total_faces )
+    {
+      _TYPES[idx].get_sizes(n_total_vertex, n_total_cells, n_total_faces );
+    }
+
+
+    void get_cells_ptr(int idx, int*& vertex_num, int*& vertex_index, int*& face_num, int*& face_index)
+    {
+      _TYPES[idx].get_cells_ptr( vertex_num, vertex_index, face_num, face_index );
+    }
+
+
+    int n_types; 
+    Regular* _TYPES;
     map<int,int>           _types;
     typedef typename map<int,int>::iterator _typesIt;
 
+    _typesIt IT; 
+    string _name; 
+
+  private: 
+//    map<int,int>           _types;
+//    typedef typename map<int,int>::iterator _typesIt;
+
      bool _run; 
      bool _debug; 
-     string _name; 
+//     string _name; 
 
      int _n_global_cells; 
 
-     Regular* _TYPES; 
+//     Regular* _TYPES; 
 }; 
 
 #endif // COMMDOM_REGULARCELLS_H 
-
